@@ -1,0 +1,73 @@
+{
+  "common": {
+    "loading": "Lädt...",
+    "error": "Fehler",
+    "retry": "Wiederholen",
+    "cancel": "Abbrechen",
+    "confirm": "Bestätigen",
+    "save": "Speichern",
+    "close": "Schließen"
+  },
+  "auth": {
+    "welcome": "Willkommen bei Hamburg Parking",
+    "signIn": "Anmelden",
+    "signUp": "Registrieren",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "name": "Name",
+    "signInWithGoogle": "Mit Google anmelden",
+    "signInWithFacebook": "Mit Facebook anmelden",
+    "createAccount": "Konto erstellen",
+    "alreadyHaveAccount": "Haben Sie bereits ein Konto?",
+    "dontHaveAccount": "Noch kein Konto?",
+    "forgotPassword": "Passwort vergessen?"
+  },
+  "map": {
+    "title": "Parkplatz-Karte",
+    "findParking": "Parkplatz finden",
+    "currentLocation": "Aktueller Standort",
+    "availableSpots": "Verfügbare Plätze",
+    "paidParking": "Kostenpflichtiges Parken",
+    "freeParking": "Kostenloses Parken",
+    "reportSpot": "Parkplatz melden",
+    "parkingAvailable": "Parkplatz verfügbar",
+    "parkingTaken": "Parkplatz besetzt"
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "newParkingSpot": "Neuer Parkplatz verfügbar",
+    "nearYou": "in Ihrer Nähe",
+    "spotTaken": "Parkplatz besetzt",
+    "noNotifications": "Noch keine Benachrichtigungen"
+  },
+  "profile": {
+    "title": "Profil",
+    "vehicleDetails": "Fahrzeugdetails",
+    "make": "Marke",
+    "model": "Modell",
+    "licensePlate": "Kennzeichen",
+    "language": "Sprache",
+    "english": "English",
+    "german": "Deutsch",
+    "signOut": "Abmelden"
+  },
+  "parking": {
+    "details": "Parkplatz-Details",
+    "address": "Adresse",
+    "type": "Typ",
+    "reportedAt": "Gemeldet um",
+    "estimatedDuration": "Geschätzte Dauer",
+    "minutes": "Minuten",
+    "reportAsAvailable": "Als verfügbar melden",
+    "reportAsTaken": "Als besetzt melden",
+    "leaveFeedback": "Feedback hinterlassen",
+    "rating": "Bewertung",
+    "comment": "Kommentar"
+  },
+  "feedback": {
+    "title": "Feedback",
+    "howWasExperience": "Wie war Ihr Parkerlebnis?",
+    "submitFeedback": "Feedback absenden",
+    "thankYou": "Vielen Dank für Ihr Feedback!"
+  }
+}
