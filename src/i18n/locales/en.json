@@ -1,0 +1,73 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "close": "Close"
+  },
+  "auth": {
+    "welcome": "Welcome to Hamburg Parking",
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "signInWithGoogle": "Sign In with Google",
+    "signInWithFacebook": "Sign In with Facebook",
+    "createAccount": "Create Account",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "forgotPassword": "Forgot Password?"
+  },
+  "map": {
+    "title": "Parking Map",
+    "findParking": "Find Parking",
+    "currentLocation": "Current Location",
+    "availableSpots": "Available Spots",
+    "paidParking": "Paid Parking",
+    "freeParking": "Free Parking",
+    "reportSpot": "Report Parking Spot",
+    "parkingAvailable": "Parking Available",
+    "parkingTaken": "Parking Taken"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "newParkingSpot": "New parking spot available",
+    "nearYou": "near you",
+    "spotTaken": "Parking spot taken",
+    "noNotifications": "No notifications yet"
+  },
+  "profile": {
+    "title": "Profile",
+    "vehicleDetails": "Vehicle Details",
+    "make": "Make",
+    "model": "Model",
+    "licensePlate": "License Plate",
+    "language": "Language",
+    "english": "English",
+    "german": "Deutsch",
+    "signOut": "Sign Out"
+  },
+  "parking": {
+    "details": "Parking Details",
+    "address": "Address",
+    "type": "Type",
+    "reportedAt": "Reported At",
+    "estimatedDuration": "Estimated Duration",
+    "minutes": "minutes",
+    "reportAsAvailable": "Report as Available",
+    "reportAsTaken": "Report as Taken",
+    "leaveFeedback": "Leave Feedback",
+    "rating": "Rating",
+    "comment": "Comment"
+  },
+  "feedback": {
+    "title": "Feedback",
+    "howWasExperience": "How was your parking experience?",
+    "submitFeedback": "Submit Feedback",
+    "thankYou": "Thank you for your feedback!"
+  }
+}

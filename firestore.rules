@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read and write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Parking spots can be read by anyone, but only created/updated by authenticated users
+    match /parkingSpots/{spotId} {
+      allow read: if true; // Public read access for all users
+      allow create: if request.auth != null && validateParkingSpot();
+      allow update: if request.auth != null && validateParkingSpotUpdate();
+      allow delete: if request.auth != null && 
+        (request.auth.uid == resource.data.reportedBy || 
+         request.auth.uid in ['admin1', 'admin2']); // Only creator or admin can delete
+    }
+    
+    // Notifications can be read by the target user
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null;
+      allow update, delete: if false; // Notifications are immutable
+    }
+    
+    // Feedback can be created by authenticated users, read by anyone
+    match /feedback/{feedbackId} {
+      allow read: if true; // Public read for calculating ratings
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId &&
+        validateFeedback();
+      allow update, delete: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+    }
+    
+    // Helper functions for validation
+    function validateParkingSpot() {
+      return request.resource.data.keys().hasAll(['latitude', 'longitude', 'address', 'isPaid', 'isAvailable', 'reportedBy']) &&
+             request.resource.data.latitude is number &&
+             request.resource.data.longitude is number &&
+             request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90 &&
+             request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180 &&
+             request.resource.data.address is string &&
+             request.resource.data.isPaid is bool &&
+             request.resource.data.isAvailable is bool &&
+             request.resource.data.reportedBy == request.auth.uid;
+    }
+    
+    function validateParkingSpotUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isAvailable', 'verifiedAt', 'rating']) &&
+             (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAvailable']) || 
+              request.resource.data.isAvailable is bool);
+    }
+    
+    function validateFeedback() {
+      return request.resource.data.keys().hasAll(['parkingSpotId', 'userId', 'rating']) &&
+             request.resource.data.rating is number &&
+             request.resource.data.rating >= 1 && request.resource.data.rating <= 5 &&
+             request.resource.data.parkingSpotId is string &&
+             request.resource.data.userId == request.auth.uid;
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "parkingSpots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isAvailable",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "reportedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "parkingSpots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isPaid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isAvailable",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "reportedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sentAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "feedback",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "parkingSpotId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
