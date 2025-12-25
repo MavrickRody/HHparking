@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Modal,
 } from 'react-native';
 import MapView, {Marker, UrlTile} from 'react-native-maps';
 import {useTranslation} from 'react-i18next';
@@ -20,6 +21,7 @@ import {OccupancyService} from '../services/OccupancyService';
 import {ParkingDataParser} from '../utils/parkingDataParser';
 import {ParkingPolygon} from '../components/Map/ParkingPolygon';
 import {ParkingButton} from '../components/ParkingButton';
+import {ParkingRecommendations, ParkingRecommendation} from '../utils/parkingRecommendations';
 import parkingData from '../../assets/hamburg-parking.json';
 
 const HAMBURG_REGION = {
@@ -42,6 +44,8 @@ export default function MapScreen() {
   const [isTracking, setIsTracking] = useState(false);
   const [isParked, setIsParked] = useState(false);
   const [selectedPolygon, setSelectedPolygon] = useState<ParkingAreaData | null>(null);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [recommendations, setRecommendations] = useState<ParkingRecommendation[]>([]);
 
   const locationService = LocationService.getInstance();
   const firebaseService = FirebaseService.getInstance();
@@ -228,6 +232,58 @@ export default function MapScreen() {
     setSelectedPolygon(area);
   };
 
+  const showParkingRecommendations = () => {
+    if (!currentLocation) {
+      Alert.alert('Location Required', 'Please enable location to see recommendations');
+      return;
+    }
+
+    const recs = ParkingRecommendations.getTopRecommendations(
+      parkingAreas,
+      occupancyData,
+      currentLocation,
+      5,
+      false // Can be made configurable for user preference
+    );
+    
+    setRecommendations(recs);
+    setShowRecommendations(true);
+  };
+
+  const navigateToRecommendation = (rec: ParkingRecommendation) => {
+    setShowRecommendations(false);
+    setSelectedPolygon(rec.area);
+    
+    // Center map on recommended parking area
+    const geometry = rec.area.polygon.geometry;
+    let coordinates: number[][][];
+    
+    if (geometry.type === 'Polygon') {
+      coordinates = geometry.coordinates as number[][][];
+    } else {
+      coordinates = (geometry.coordinates as number[][][][])[0];
+    }
+    
+    const ring = coordinates[0];
+    let sumLat = 0;
+    let sumLng = 0;
+    
+    for (const [lng, lat] of ring) {
+      sumLat += lat;
+      sumLng += lng;
+    }
+    
+    const centerLat = sumLat / ring.length;
+    const centerLng = sumLng / ring.length;
+    
+    mapRef.current?.animateToRegion({
+      latitude: centerLat,
+      longitude: centerLng,
+      latitudeDelta: 0.005,
+      longitudeDelta: 0.005,
+    });
+  };
+
   const centerOnCurrentLocation = () => {
     if (currentLocation && mapRef.current) {
       mapRef.current.animateToRegion({
@@ -347,6 +403,12 @@ export default function MapScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={styles.controlButton}
+          onPress={showParkingRecommendations}>
+          <Icon name="recommend" size={24} color="#007AFF" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[
             styles.controlButton,
             styles.trackingButton,
@@ -375,6 +437,51 @@ export default function MapScreen() {
           onPress={handleManualParkingButton}
         />
       </View>
+
+      {/* Recommendations Modal */}
+      <Modal
+        visible={showRecommendations}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowRecommendations(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Recommended Parking</Text>
+              <TouchableOpacity onPress={() => setShowRecommendations(false)}>
+                <Icon name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.recommendationsList}>
+              {recommendations.map((rec, index) => (
+                <TouchableOpacity
+                  key={rec.area.id}
+                  style={styles.recommendationItem}
+                  onPress={() => navigateToRecommendation(rec)}
+                >
+                  <View style={styles.recommendationRank}>
+                    <Text style={styles.recommendationRankText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.recommendationDetails}>
+                    <Text style={styles.recommendationStreet}>{rec.area.streetName}</Text>
+                    <Text style={styles.recommendationInfo}>{rec.reason}</Text>
+                    <Text style={styles.recommendationDistance}>
+                      {ParkingRecommendations.formatDistance(rec.distance)} away
+                    </Text>
+                  </View>
+                  <Icon name="chevron-right" size={24} color="#ccc" />
+                </TouchableOpacity>
+              ))}
+              {recommendations.length === 0 && (
+                <Text style={styles.noRecommendations}>
+                  No parking recommendations available at this time
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -510,5 +617,79 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  recommendationsList: {
+    padding: 10,
+  },
+  recommendationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  recommendationRank: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  recommendationRankText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  recommendationDetails: {
+    flex: 1,
+  },
+  recommendationStreet: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  recommendationInfo: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 2,
+  },
+  recommendationDistance: {
+    fontSize: 12,
+    color: '#999',
+  },
+  noRecommendations: {
+    textAlign: 'center',
+    color: '#999',
+    fontSize: 14,
+    marginTop: 40,
   },
 });
