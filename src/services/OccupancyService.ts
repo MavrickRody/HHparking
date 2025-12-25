@@ -1,4 +1,5 @@
 import {ParkingOccupancy, ParkingEvent, ParkingAreaData} from '../types';
+import {OCCUPANCY_THRESHOLDS, OCCUPANCY_COLORS} from '../utils/constants';
 
 /**
  * Service for managing real-time parking occupancy data
@@ -35,9 +36,11 @@ export class OccupancyService {
    * Record a parking event (parked or departed)
    */
   recordParkingEvent(event: Omit<ParkingEvent, 'id'>): void {
+    // Generate a more robust ID with timestamp and random component to avoid collisions
+    const randomSuffix = Math.random().toString(36).substring(2, 9);
     const eventWithId: ParkingEvent = {
       ...event,
-      id: `${event.userId}_${event.timestamp.getTime()}`,
+      id: `${event.userId}_${event.timestamp.getTime()}_${randomSuffix}`,
     };
 
     // Store event
@@ -97,10 +100,10 @@ export class OccupancyService {
    */
   private cleanupOldEvents(polygonId: string): void {
     const events = this.parkingEvents.get(polygonId) || [];
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const expirationTime = new Date(Date.now() - OCCUPANCY_THRESHOLDS.DATA_EXPIRATION);
 
     const recentEvents = events.filter(
-      event => event.timestamp > twentyFourHoursAgo
+      event => event.timestamp > expirationTime
     );
 
     this.parkingEvents.set(polygonId, recentEvents);
@@ -124,12 +127,12 @@ export class OccupancyService {
    * Get color code based on occupancy rate
    */
   getOccupancyColor(occupancyRate: number): string {
-    if (occupancyRate < 0.5) {
-      return '#4CAF50'; // Green - plenty of spots
-    } else if (occupancyRate < 0.8) {
-      return '#FFC107'; // Yellow - limited spots
+    if (occupancyRate < OCCUPANCY_THRESHOLDS.AVAILABLE) {
+      return OCCUPANCY_COLORS.AVAILABLE;
+    } else if (occupancyRate < OCCUPANCY_THRESHOLDS.LIMITED) {
+      return OCCUPANCY_COLORS.LIMITED;
     } else {
-      return '#F44336'; // Red - very few spots
+      return OCCUPANCY_COLORS.FULL;
     }
   }
 
@@ -139,9 +142,9 @@ export class OccupancyService {
   getOccupancyStatus(occupancyRate: number): 'available' | 'limited' | 'full' | 'unknown' {
     if (occupancyRate < 0) {
       return 'unknown';
-    } else if (occupancyRate < 0.5) {
+    } else if (occupancyRate < OCCUPANCY_THRESHOLDS.AVAILABLE) {
       return 'available';
-    } else if (occupancyRate < 0.8) {
+    } else if (occupancyRate < OCCUPANCY_THRESHOLDS.LIMITED) {
       return 'limited';
     } else {
       return 'full';
@@ -155,8 +158,8 @@ export class OccupancyService {
     const occupancy = this.occupancyData.get(polygonId);
     if (!occupancy) return true;
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    return occupancy.lastUpdated < oneHourAgo;
+    const staleTime = new Date(Date.now() - OCCUPANCY_THRESHOLDS.STALE_DATA);
+    return occupancy.lastUpdated < staleTime;
   }
 
   /**

@@ -1,6 +1,11 @@
 import React from 'react';
 import {Polygon} from 'react-native-maps';
 import {ParkingAreaData, ParkingOccupancy} from '../../types';
+import {
+  OCCUPANCY_COLORS,
+  PARKING_TYPE_COLORS,
+  OCCUPANCY_THRESHOLDS,
+} from '../../utils/constants';
 
 interface ParkingPolygonProps {
   parkingArea: ParkingAreaData;
@@ -37,25 +42,25 @@ export const ParkingPolygon: React.FC<ParkingPolygonProps> = ({
 
   const getFillColor = (): string => {
     if (!occupancy) {
-      return 'rgba(128, 128, 128, 0.3)'; // Gray for no data
+      return OCCUPANCY_COLORS.NO_DATA_FILL;
     }
 
     const rate = occupancy.occupancyRate;
     
-    if (rate < 0.5) {
-      return 'rgba(76, 175, 80, 0.4)'; // Green - plenty of spots
-    } else if (rate < 0.8) {
-      return 'rgba(255, 193, 7, 0.4)'; // Yellow - limited spots
+    if (rate < OCCUPANCY_THRESHOLDS.AVAILABLE) {
+      return OCCUPANCY_COLORS.AVAILABLE_FILL;
+    } else if (rate < OCCUPANCY_THRESHOLDS.LIMITED) {
+      return OCCUPANCY_COLORS.LIMITED_FILL;
     } else {
-      return 'rgba(244, 67, 54, 0.4)'; // Red - very few spots
+      return OCCUPANCY_COLORS.FULL_FILL;
     }
   };
 
   const getStrokeColor = (): string => {
     if (parkingArea.isPaid) {
-      return '#FF5722'; // Orange for paid parking
+      return PARKING_TYPE_COLORS.PAID;
     } else {
-      return '#2196F3'; // Blue for free parking
+      return PARKING_TYPE_COLORS.FREE;
     }
   };
 

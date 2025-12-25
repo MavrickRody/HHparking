@@ -1,4 +1,9 @@
 import {ParkingPolygonFeature, ParkingAreaData} from '../types';
+import {
+  GEO_CONSTANTS,
+  PARKING_DIMENSIONS,
+  CAPACITY_SETTINGS,
+} from './constants';
 
 /**
  * Utility class for parsing and processing Hamburg parking GeoJSON data
@@ -43,38 +48,29 @@ export class ParkingDataParser {
     const area = this.calculatePolygonArea(feature.geometry);
     const orientation = feature.properties.ausrichtung_zur_strasse;
     
-    // Parking space dimensions (meters)
-    const PARALLEL_LENGTH = 6; // längs
-    const PARALLEL_WIDTH = 2;
-    const PERPENDICULAR_LENGTH = 5; // quer
-    const PERPENDICULAR_WIDTH = 2.5;
-    const DIAGONAL_LENGTH = 5; // schräg
-    const DIAGONAL_WIDTH = 2.5;
-    
     let spotArea: number;
     
     switch (orientation.toLowerCase()) {
       case 'längs':
       case 'parallel':
-        spotArea = PARALLEL_LENGTH * PARALLEL_WIDTH;
+        spotArea = PARKING_DIMENSIONS.PARALLEL_LENGTH * PARKING_DIMENSIONS.PARALLEL_WIDTH;
         break;
       case 'quer':
       case 'perpendicular':
-        spotArea = PERPENDICULAR_LENGTH * PERPENDICULAR_WIDTH;
+        spotArea = PARKING_DIMENSIONS.PERPENDICULAR_LENGTH * PARKING_DIMENSIONS.PERPENDICULAR_WIDTH;
         break;
       case 'schräg':
       case 'diagonal':
-        spotArea = DIAGONAL_LENGTH * DIAGONAL_WIDTH;
+        spotArea = PARKING_DIMENSIONS.DIAGONAL_LENGTH * PARKING_DIMENSIONS.DIAGONAL_WIDTH;
         break;
       default:
-        spotArea = PARALLEL_LENGTH * PARALLEL_WIDTH;
+        spotArea = PARKING_DIMENSIONS.PARALLEL_LENGTH * PARKING_DIMENSIONS.PARALLEL_WIDTH;
     }
     
     // Calculate capacity with efficiency factor (not all area can be used)
-    const efficiency = 0.7; // 70% of area is usable
-    const capacity = Math.floor((area * efficiency) / spotArea);
+    const capacity = Math.floor((area * CAPACITY_SETTINGS.EFFICIENCY) / spotArea);
     
-    return Math.max(1, capacity); // At least 1 spot
+    return Math.max(CAPACITY_SETTINGS.MIN_CAPACITY, capacity);
   }
 
   /**
@@ -93,20 +89,16 @@ export class ParkingDataParser {
     
     const ring = coordinates[0]; // Outer ring
     
-    // Convert to meters using approximate conversion for Hamburg latitude
-    const HAMBURG_LAT = 53.5511;
-    const metersPerDegreeLat = 111320; // meters per degree latitude
-    const metersPerDegreeLon = 111320 * Math.cos(HAMBURG_LAT * Math.PI / 180);
-    
+    // Convert to meters using constants for Hamburg latitude
     let area = 0;
     for (let i = 0; i < ring.length - 1; i++) {
       const [lon1, lat1] = ring[i];
       const [lon2, lat2] = ring[i + 1];
       
-      const x1 = lon1 * metersPerDegreeLon;
-      const y1 = lat1 * metersPerDegreeLat;
-      const x2 = lon2 * metersPerDegreeLon;
-      const y2 = lat2 * metersPerDegreeLat;
+      const x1 = lon1 * GEO_CONSTANTS.METERS_PER_DEGREE_LON;
+      const y1 = lat1 * GEO_CONSTANTS.METERS_PER_DEGREE_LAT;
+      const x2 = lon2 * GEO_CONSTANTS.METERS_PER_DEGREE_LON;
+      const y2 = lat2 * GEO_CONSTANTS.METERS_PER_DEGREE_LAT;
       
       area += x1 * y2 - x2 * y1;
     }

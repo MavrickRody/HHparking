@@ -104,7 +104,10 @@ export class ParkingRecommendations {
     }
 
     // Capacity factor (larger areas are more likely to have spots)
-    score += Math.log(area.estimatedCapacity) * 5;
+    // Guard against log(0) which would return -Infinity
+    if (area.estimatedCapacity > 0) {
+      score += Math.log(area.estimatedCapacity) * 5;
+    }
 
     return score;
   }

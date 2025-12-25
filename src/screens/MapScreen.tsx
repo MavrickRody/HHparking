@@ -185,7 +185,7 @@ export default function MapScreen() {
 
     if (polygon) {
       occupancyService.recordParkingEvent({
-        userId: 'current-user-id', // This would come from auth
+        userId: 'current-user-id', // TODO: Replace with actual authenticated user ID from Firebase Auth
         polygonId: polygon.id,
         eventType,
         timestamp: new Date(),
