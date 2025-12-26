@@ -62,11 +62,13 @@ A React Native mobile application that helps users find available street parking
 ## Installation
 
 ### Prerequisites
-- Node.js 16 or higher
+- Node.js 18 or higher
 - React Native CLI
 - Android Studio (for Android development)
-- Xcode (for iOS development)
+- Xcode (for iOS development - macOS only)
 - Firebase project with proper configuration
+
+**Ubuntu Users**: See [UBUNTU_SETUP.md](UBUNTU_SETUP.md) for complete Ubuntu-specific setup guide including all system dependencies, Android Studio, KVM configuration, and troubleshooting.
 
 ### Setup
 1. **Clone the repository**
