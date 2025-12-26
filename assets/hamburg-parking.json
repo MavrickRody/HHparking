@@ -1,0 +1,120 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "DE.HH.UP_PARKRAUM_15965037",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [9.9700, 53.5650],
+          [9.9710, 53.5650],
+          [9.9710, 53.5655],
+          [9.9700, 53.5655],
+          [9.9700, 53.5650]
+        ]]
+      },
+      "properties": {
+        "ausrichtung_zur_strasse": "längs",
+        "markierung": "nein",
+        "fahrzeugtyp": "Allgemein",
+        "primaere_bewirtschaftung": "Parkschein",
+        "geltungszeit_primaerer_bewirtschaftung": "Mo-Fr 9-18",
+        "strassenname": "Beim Schlump"
+      },
+      "srsName": "EPSG:4326"
+    },
+    {
+      "type": "Feature",
+      "id": "DE.HH.UP_PARKRAUM_15965038",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [9.9720, 53.5660],
+          [9.9730, 53.5660],
+          [9.9730, 53.5665],
+          [9.9720, 53.5665],
+          [9.9720, 53.5660]
+        ]]
+      },
+      "properties": {
+        "ausrichtung_zur_strasse": "quer",
+        "markierung": "ja",
+        "fahrzeugtyp": "Allgemein",
+        "primaere_bewirtschaftung": "frei",
+        "geltungszeit_primaerer_bewirtschaftung": "",
+        "strassenname": "Grindelallee"
+      },
+      "srsName": "EPSG:4326"
+    },
+    {
+      "type": "Feature",
+      "id": "DE.HH.UP_PARKRAUM_15965039",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [9.9740, 53.5670],
+          [9.9750, 53.5670],
+          [9.9750, 53.5675],
+          [9.9740, 53.5675],
+          [9.9740, 53.5670]
+        ]]
+      },
+      "properties": {
+        "ausrichtung_zur_strasse": "schräg",
+        "markierung": "ja",
+        "fahrzeugtyp": "Allgemein",
+        "primaere_bewirtschaftung": "Bewohnerparken",
+        "geltungszeit_primaerer_bewirtschaftung": "Mo-So 0-24",
+        "strassenname": "Rothenbaumchaussee"
+      },
+      "srsName": "EPSG:4326"
+    },
+    {
+      "type": "Feature",
+      "id": "DE.HH.UP_PARKRAUM_15965040",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [9.9800, 53.5500],
+          [9.9810, 53.5500],
+          [9.9810, 53.5505],
+          [9.9800, 53.5505],
+          [9.9800, 53.5500]
+        ]]
+      },
+      "properties": {
+        "ausrichtung_zur_strasse": "längs",
+        "markierung": "ja",
+        "fahrzeugtyp": "Allgemein",
+        "primaere_bewirtschaftung": "frei",
+        "geltungszeit_primaerer_bewirtschaftung": "",
+        "strassenname": "Jungfernstieg"
+      },
+      "srsName": "EPSG:4326"
+    },
+    {
+      "type": "Feature",
+      "id": "DE.HH.UP_PARKRAUM_15965041",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [9.9920, 53.5510],
+          [9.9930, 53.5510],
+          [9.9930, 53.5515],
+          [9.9920, 53.5515],
+          [9.9920, 53.5510]
+        ]]
+      },
+      "properties": {
+        "ausrichtung_zur_strasse": "quer",
+        "markierung": "nein",
+        "fahrzeugtyp": "Allgemein",
+        "primaere_bewirtschaftung": "Parkschein",
+        "geltungszeit_primaerer_bewirtschaftung": "Mo-Sa 8-20",
+        "strassenname": "Mönckebergstraße"
+      },
+      "srsName": "EPSG:4326"
+    }
+  ]
+}

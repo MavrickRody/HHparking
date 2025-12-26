@@ -6,15 +6,23 @@ import {
   Text,
   Alert,
   ActivityIndicator,
+  ScrollView,
+  Modal,
 } from 'react-native';
-import MapView, {Marker, PROVIDER_GOOGLE} from 'react-native-maps';
+import MapView, {Marker, UrlTile} from 'react-native-maps';
 import {useTranslation} from 'react-i18next';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useNavigation} from '@react-navigation/native';
 
-import {ParkingSpot} from '../types';
+import {ParkingSpot, ParkingAreaData, ParkingOccupancy} from '../types';
 import {LocationService} from '../services/LocationService';
 import {FirebaseService} from '../services/FirebaseService';
+import {OccupancyService} from '../services/OccupancyService';
+import {ParkingDataParser} from '../utils/parkingDataParser';
+import {ParkingPolygon} from '../components/Map/ParkingPolygon';
+import {ParkingButton} from '../components/ParkingButton';
+import {ParkingRecommendations, ParkingRecommendation} from '../utils/parkingRecommendations';
+import parkingData from '../../assets/hamburg-parking.json';
 
 const HAMBURG_REGION = {
   latitude: 53.5511,
@@ -30,18 +38,53 @@ export default function MapScreen() {
 
   const [currentLocation, setCurrentLocation] = useState<{latitude: number; longitude: number} | null>(null);
   const [parkingSpots, setParkingSpots] = useState<ParkingSpot[]>([]);
+  const [parkingAreas, setParkingAreas] = useState<ParkingAreaData[]>([]);
+  const [occupancyData, setOccupancyData] = useState<Map<string, ParkingOccupancy>>(new Map());
   const [loading, setLoading] = useState(true);
   const [isTracking, setIsTracking] = useState(false);
+  const [isParked, setIsParked] = useState(false);
+  const [selectedPolygon, setSelectedPolygon] = useState<ParkingAreaData | null>(null);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [recommendations, setRecommendations] = useState<ParkingRecommendation[]>([]);
 
   const locationService = LocationService.getInstance();
   const firebaseService = FirebaseService.getInstance();
+  const occupancyService = OccupancyService.getInstance();
 
   useEffect(() => {
+    loadParkingData();
     initializeLocation();
     return () => {
       locationService.stopLocationTracking();
     };
   }, []);
+
+  const loadParkingData = () => {
+    try {
+      const areas: ParkingAreaData[] = parkingData.features.map(feature =>
+        ParkingDataParser.parseParkingFeature(feature as any)
+      );
+      setParkingAreas(areas);
+      
+      // Initialize occupancy for all areas
+      areas.forEach(area => occupancyService.initializeOccupancy(area));
+      
+      // Set parking areas in location service for geofencing
+      locationService.setParkingAreas(areas);
+      
+      // Load initial occupancy data
+      updateOccupancyData();
+    } catch (error) {
+      console.error('Error loading parking data:', error);
+    }
+  };
+
+  const updateOccupancyData = () => {
+    const allOccupancy = occupancyService.getAllOccupancy();
+    const occupancyMap = new Map<string, ParkingOccupancy>();
+    allOccupancy.forEach(occ => occupancyMap.set(occ.polygonId, occ));
+    setOccupancyData(occupancyMap);
+  };
 
   const initializeLocation = async () => {
     try {
@@ -94,28 +137,31 @@ export default function MapScreen() {
       },
       // Parking detected callback
       async (location) => {
-        Alert.alert(
-          t('map.parkingAvailable'),
-          'Did you just park? Would you like to report this parking spot?',
-          [
-            {text: t('common.cancel'), style: 'cancel'},
-            {
-              text: t('common.confirm'),
-              onPress: () => reportParkingSpot(location, false), // false = leaving spot
-            },
-          ],
-        );
+        const polygon = locationService.findParkingPolygon(location);
+        if (polygon) {
+          Alert.alert(
+            'Parking Detected',
+            `Did you just park at ${polygon.streetName}?`,
+            [
+              {text: 'No', style: 'cancel'},
+              {
+                text: 'Yes',
+                onPress: () => handleParkingEvent(location, polygon.id, 'parked'),
+              },
+            ],
+          );
+        }
       },
       // Leaving detected callback
       async (location) => {
         Alert.alert(
-          t('map.parkingAvailable'),
-          'You seem to be leaving a parking spot. Should we mark it as available?',
+          'Leaving Parking',
+          'Are you leaving the parking spot?',
           [
-            {text: t('common.cancel'), style: 'cancel'},
+            {text: 'No', style: 'cancel'},
             {
-              text: t('common.confirm'),
-              onPress: () => reportParkingSpot(location, true), // true = spot available
+              text: 'Yes',
+              onPress: () => handleParkingEvent(location, null, 'departed'),
             },
           ],
         );
@@ -123,71 +169,119 @@ export default function MapScreen() {
     );
   };
 
+  const handleParkingEvent = (
+    location: {latitude: number; longitude: number},
+    polygonId: string | null,
+    eventType: 'parked' | 'departed'
+  ) => {
+    const polygon = polygonId 
+      ? parkingAreas.find(a => a.id === polygonId)
+      : locationService.findParkingPolygon(location);
+    
+    if (!polygon && eventType === 'parked') {
+      Alert.alert('Error', 'You are not in a marked parking area');
+      return;
+    }
+
+    if (polygon) {
+      occupancyService.recordParkingEvent({
+        userId: 'current-user-id', // TODO: Replace with actual authenticated user ID from Firebase Auth
+        polygonId: polygon.id,
+        eventType,
+        timestamp: new Date(),
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
+
+      setIsParked(eventType === 'parked');
+      updateOccupancyData();
+      
+      Alert.alert(
+        'Success',
+        `Parking ${eventType === 'parked' ? 'recorded' : 'spot marked as available'} at ${polygon.streetName}`
+      );
+    }
+  };
+
   const stopLocationTracking = () => {
     setIsTracking(false);
     locationService.stopLocationTracking();
   };
 
-  const reportParkingSpot = async (
-    location: {latitude: number; longitude: number},
-    isAvailable: boolean,
-  ) => {
-    try {
-      const address = await locationService.reverseGeocode(
-        location.latitude,
-        location.longitude,
-      );
+  const handleManualParkingButton = () => {
+    if (!currentLocation) return;
 
-      // Simple heuristic to determine if it's paid parking
-      // In a real app, this would use city parking data or APIs
-      const isPaid = await determinePaidParking(location);
-
-      const parkingSpot: Omit<ParkingSpot, 'id'> = {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address,
-        isPaid,
-        isAvailable,
-        reportedBy: 'current-user-id', // This would come from auth context
-        reportedAt: new Date(),
-        estimatedDuration: isAvailable ? 60 : undefined, // 1 hour estimate
-      };
-
-      await firebaseService.createParkingSpot(parkingSpot);
-
-      // Send notification to nearby users
-      await firebaseService.sendParkingNotification({
-        parkingSpotId: 'new-spot-id',
-        type: isAvailable ? 'parking_available' : 'parking_taken',
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address,
-        isPaid,
-        userId: 'current-user-id',
-      });
-
-      // Refresh parking spots
-      await loadNearbyParkingSpots(location.latitude, location.longitude);
-
-      Alert.alert(
-        t('common.confirm'),
-        `Parking spot has been reported as ${isAvailable ? 'available' : 'taken'}`,
-      );
-    } catch (error) {
-      console.error('Error reporting parking spot:', error);
-      Alert.alert(t('common.error'), 'Failed to report parking spot');
+    if (isParked) {
+      // User is leaving
+      handleParkingEvent(currentLocation, null, 'departed');
+    } else {
+      // User is parking
+      const polygon = locationService.findParkingPolygon(currentLocation);
+      if (polygon) {
+        handleParkingEvent(currentLocation, polygon.id, 'parked');
+      } else {
+        Alert.alert(
+          'Not in Parking Area',
+          'You are not currently in a marked parking area'
+        );
+      }
     }
   };
 
-  const determinePaidParking = async (location: {latitude: number; longitude: number}): Promise<boolean> => {
-    // This is a simplified implementation
-    // In a real app, you would check against Hamburg's parking zone data
-    // For now, we'll use a simple distance-from-city-center heuristic
-    const cityCenter = {latitude: 53.5511, longitude: 9.9937};
-    const distance = locationService.calculateDistance ? 
-      locationService.calculateDistance(cityCenter, location) : 0;
+  const handlePolygonPress = (area: ParkingAreaData) => {
+    setSelectedPolygon(area);
+  };
+
+  const showParkingRecommendations = () => {
+    if (!currentLocation) {
+      Alert.alert('Location Required', 'Please enable location to see recommendations');
+      return;
+    }
+
+    const recs = ParkingRecommendations.getTopRecommendations(
+      parkingAreas,
+      occupancyData,
+      currentLocation,
+      5,
+      false // Can be made configurable for user preference
+    );
     
-    return distance < 3000; // Within 3km of city center = paid parking
+    setRecommendations(recs);
+    setShowRecommendations(true);
+  };
+
+  const navigateToRecommendation = (rec: ParkingRecommendation) => {
+    setShowRecommendations(false);
+    setSelectedPolygon(rec.area);
+    
+    // Center map on recommended parking area
+    const geometry = rec.area.polygon.geometry;
+    let coordinates: number[][][];
+    
+    if (geometry.type === 'Polygon') {
+      coordinates = geometry.coordinates as number[][][];
+    } else {
+      coordinates = (geometry.coordinates as number[][][][])[0];
+    }
+    
+    const ring = coordinates[0];
+    let sumLat = 0;
+    let sumLng = 0;
+    
+    for (const [lng, lat] of ring) {
+      sumLat += lat;
+      sumLng += lng;
+    }
+    
+    const centerLat = sumLat / ring.length;
+    const centerLng = sumLng / ring.length;
+    
+    mapRef.current?.animateToRegion({
+      latitude: centerLat,
+      longitude: centerLng,
+      latitudeDelta: 0.005,
+      longitudeDelta: 0.005,
+    });
   };
 
   const centerOnCurrentLocation = () => {
@@ -200,15 +294,11 @@ export default function MapScreen() {
     }
   };
 
-  const onMarkerPress = (spot: ParkingSpot) => {
-    navigation.navigate('ParkingDetails', {parkingSpot: spot});
-  };
-
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>{t('common.loading')}</Text>
+        <Text style={styles.loadingText}>Loading parking data...</Text>
       </View>
     );
   }
@@ -218,35 +308,91 @@ export default function MapScreen() {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
         initialRegion={HAMBURG_REGION}
         showsUserLocation={true}
         showsMyLocationButton={false}>
         
+        {/* OpenStreetMap tiles */}
+        <UrlTile
+          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maximumZ={19}
+          flipY={false}
+        />
+
+        {/* Parking polygon overlays */}
+        {parkingAreas.map(area => (
+          <ParkingPolygon
+            key={area.id}
+            parkingArea={area}
+            occupancy={occupancyData.get(area.id)}
+            onPress={() => handlePolygonPress(area)}
+          />
+        ))}
+
         {/* Current location marker */}
         {currentLocation && (
           <Marker
             coordinate={currentLocation}
-            title={t('map.currentLocation')}
+            title="Your Location"
             pinColor="blue"
           />
         )}
-
-        {/* Parking spot markers */}
-        {parkingSpots.map((spot) => (
-          <Marker
-            key={spot.id}
-            coordinate={{
-              latitude: spot.latitude,
-              longitude: spot.longitude,
-            }}
-            title={spot.isPaid ? t('map.paidParking') : t('map.freeParking')}
-            description={spot.address}
-            pinColor={spot.isPaid ? 'red' : 'green'}
-            onPress={() => onMarkerPress(spot)}
-          />
-        ))}
       </MapView>
+
+      {/* Legend */}
+      <View style={styles.legend}>
+        <Text style={styles.legendTitle}>Occupancy</Text>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, {backgroundColor: 'rgba(76, 175, 80, 0.4)'}]} />
+          <Text style={styles.legendText}>Available (&lt;50%)</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, {backgroundColor: 'rgba(255, 193, 7, 0.4)'}]} />
+          <Text style={styles.legendText}>Limited (50-80%)</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, {backgroundColor: 'rgba(244, 67, 54, 0.4)'}]} />
+          <Text style={styles.legendText}>Full (&gt;80%)</Text>
+        </View>
+        <Text style={styles.legendTitle}>Border</Text>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, {backgroundColor: '#FF5722'}]} />
+          <Text style={styles.legendText}>Paid parking</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, {backgroundColor: '#2196F3'}]} />
+          <Text style={styles.legendText}>Free parking</Text>
+        </View>
+      </View>
+
+      {/* Selected polygon info */}
+      {selectedPolygon && (
+        <View style={styles.polygonInfo}>
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={() => setSelectedPolygon(null)}
+          >
+            <Icon name="close" size={20} color="#666" />
+          </TouchableOpacity>
+          <Text style={styles.polygonInfoTitle}>{selectedPolygon.streetName}</Text>
+          <Text style={styles.polygonInfoText}>
+            Type: {selectedPolygon.isPaid ? 'Paid Parking' : 'Free Parking'}
+          </Text>
+          <Text style={styles.polygonInfoText}>
+            Capacity: ~{selectedPolygon.estimatedCapacity} spots
+          </Text>
+          {occupancyData.get(selectedPolygon.id) && (
+            <>
+              <Text style={styles.polygonInfoText}>
+                Available: {occupancyData.get(selectedPolygon.id)!.availableSpots} spots
+              </Text>
+              <Text style={styles.polygonInfoText}>
+                Occupied: {occupancyData.get(selectedPolygon.id)!.occupiedSpots} spots
+              </Text>
+            </>
+          )}
+        </View>
+      )}
 
       {/* Control buttons */}
       <View style={styles.controls}>
@@ -254,6 +400,12 @@ export default function MapScreen() {
           style={styles.controlButton}
           onPress={centerOnCurrentLocation}>
           <Icon name="my-location" size={24} color="#007AFF" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={showParkingRecommendations}>
+          <Icon name="recommend" size={24} color="#007AFF" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -273,35 +425,63 @@ export default function MapScreen() {
               styles.trackingText,
               isTracking && styles.activeTrackingText,
             ]}>
-            {isTracking ? 'Stop Tracking' : 'Start Tracking'}
+            {isTracking ? 'Auto Detection' : 'Start Auto'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Floating action button for manual reporting */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => {
-          if (currentLocation) {
-            Alert.alert(
-              t('map.reportSpot'),
-              'Is there a parking spot available at your current location?',
-              [
-                {text: t('common.cancel'), style: 'cancel'},
-                {
-                  text: t('map.parkingAvailable'),
-                  onPress: () => reportParkingSpot(currentLocation, true),
-                },
-                {
-                  text: t('map.parkingTaken'),
-                  onPress: () => reportParkingSpot(currentLocation, false),
-                },
-              ],
-            );
-          }
-        }}>
-        <Icon name="add" size={24} color="#fff" />
-      </TouchableOpacity>
+      {/* Manual parking button */}
+      <View style={styles.parkingButtonContainer}>
+        <ParkingButton
+          isParked={isParked}
+          onPress={handleManualParkingButton}
+        />
+      </View>
+
+      {/* Recommendations Modal */}
+      <Modal
+        visible={showRecommendations}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowRecommendations(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Recommended Parking</Text>
+              <TouchableOpacity onPress={() => setShowRecommendations(false)}>
+                <Icon name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.recommendationsList}>
+              {recommendations.map((rec, index) => (
+                <TouchableOpacity
+                  key={rec.area.id}
+                  style={styles.recommendationItem}
+                  onPress={() => navigateToRecommendation(rec)}
+                >
+                  <View style={styles.recommendationRank}>
+                    <Text style={styles.recommendationRankText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.recommendationDetails}>
+                    <Text style={styles.recommendationStreet}>{rec.area.streetName}</Text>
+                    <Text style={styles.recommendationInfo}>{rec.reason}</Text>
+                    <Text style={styles.recommendationDistance}>
+                      {ParkingRecommendations.formatDistance(rec.distance)} away
+                    </Text>
+                  </View>
+                  <Icon name="chevron-right" size={24} color="#ccc" />
+                </TouchableOpacity>
+              ))}
+              {recommendations.length === 0 && (
+                <Text style={styles.noRecommendations}>
+                  No parking recommendations available at this time
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -322,6 +502,73 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  legend: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: 10,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    maxWidth: 150,
+  },
+  legendTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    marginTop: 5,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
+  legendColor: {
+    width: 20,
+    height: 12,
+    marginRight: 5,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  legendText: {
+    fontSize: 10,
+    color: '#333',
+  },
+  polygonInfo: {
+    position: 'absolute',
+    bottom: 180,
+    left: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: 15,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
+  polygonInfoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
+  },
+  polygonInfoText: {
+    fontSize: 14,
+    marginBottom: 4,
+    color: '#666',
   },
   controls: {
     position: 'absolute',
@@ -364,23 +611,85 @@ const styles = StyleSheet.create({
   activeTrackingText: {
     color: '#fff',
   },
-  fab: {
+  parkingButtonContainer: {
     position: 'absolute',
-    bottom: 80,
-    right: 20,
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  recommendationsList: {
+    padding: 10,
+  },
+  recommendationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  recommendationRank: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#007AFF',
-    borderRadius: 30,
-    width: 60,
-    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    marginRight: 12,
+  },
+  recommendationRankText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  recommendationDetails: {
+    flex: 1,
+  },
+  recommendationStreet: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  recommendationInfo: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 2,
+  },
+  recommendationDistance: {
+    fontSize: 12,
+    color: '#999',
+  },
+  noRecommendations: {
+    textAlign: 'center',
+    color: '#999',
+    fontSize: 14,
+    marginTop: 40,
   },
 });

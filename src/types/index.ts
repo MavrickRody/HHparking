@@ -51,6 +51,56 @@ export interface LocationPermission {
   blocked: boolean;
 }
 
+// GeoJSON Types for Hamburg Parking Data
+export interface ParkingPolygonGeometry {
+  type: 'Polygon' | 'MultiPolygon';
+  coordinates: number[][][] | number[][][][];
+}
+
+export interface ParkingPolygonProperties {
+  ausrichtung_zur_strasse: string; // e.g., "längs", "quer", "schräg"
+  markierung: string; // e.g., "ja", "nein"
+  fahrzeugtyp: string; // e.g., "Allgemein"
+  primaere_bewirtschaftung: string; // e.g., "Parkschein", "Bewohnerparken", "frei"
+  geltungszeit_primaerer_bewirtschaftung?: string;
+  strassenname: string;
+}
+
+export interface ParkingPolygonFeature {
+  type: 'Feature';
+  id: string;
+  geometry: ParkingPolygonGeometry;
+  properties: ParkingPolygonProperties;
+  srsName: string;
+}
+
+export interface ParkingAreaData {
+  id: string;
+  polygon: ParkingPolygonFeature;
+  isPaid: boolean;
+  estimatedCapacity: number;
+  streetName: string;
+}
+
+export interface ParkingOccupancy {
+  polygonId: string;
+  totalCapacity: number;
+  occupiedSpots: number;
+  availableSpots: number;
+  lastUpdated: Date;
+  occupancyRate: number; // 0-1
+}
+
+export interface ParkingEvent {
+  id: string;
+  userId: string;
+  polygonId: string;
+  eventType: 'parked' | 'departed';
+  timestamp: Date;
+  latitude: number;
+  longitude: number;
+}
+
 export interface AppState {
   user: User | null;
   isAuthenticated: boolean;

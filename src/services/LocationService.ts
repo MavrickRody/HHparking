@@ -1,20 +1,42 @@
 import Geolocation from 'react-native-geolocation-service';
 import {PermissionsAndroid, Platform, Alert} from 'react-native';
-import {LocationPermission} from '../types';
+import {LocationPermission, ParkingAreaData} from '../types';
+import {ParkingDataParser} from '../utils/parkingDataParser';
 
 export class LocationService {
   private static instance: LocationService;
   private watchId: number | null = null;
   private lastLocation: {latitude: number; longitude: number} | null = null;
   private isParked = false;
-  private stationaryThreshold = 30; // seconds
+  private stationaryThreshold = 120; // 2 minutes in seconds
   private stationaryTimer: NodeJS.Timeout | null = null;
+  private currentParkingPolygon: string | null = null;
+  private parkingAreas: ParkingAreaData[] = [];
 
   public static getInstance(): LocationService {
     if (!LocationService.instance) {
       LocationService.instance = new LocationService();
     }
     return LocationService.instance;
+  }
+
+  /**
+   * Set parking areas for geofencing
+   */
+  setParkingAreas(areas: ParkingAreaData[]): void {
+    this.parkingAreas = areas;
+  }
+
+  /**
+   * Find which parking polygon (if any) contains the given location
+   */
+  findParkingPolygon(location: {latitude: number; longitude: number}): ParkingAreaData | null {
+    for (const area of this.parkingAreas) {
+      if (ParkingDataParser.isPointInPolygon(location, area.polygon)) {
+        return area;
+      }
+    }
+    return null;
   }
 
   async requestLocationPermission(): Promise<LocationPermission> {
@@ -118,12 +140,16 @@ export class LocationService {
 
     const distance = this.calculateDistance(this.lastLocation, newLocation);
     const isStationary = distance < 20; // Less than 20 meters movement
+    
+    // Check if user is in a parking polygon
+    const parkingPolygon = this.findParkingPolygon(newLocation);
 
-    if (isStationary && !this.isParked) {
-      // User might be parking
+    if (isStationary && !this.isParked && parkingPolygon) {
+      // User is stationary within a parking polygon - might be parking
       if (!this.stationaryTimer) {
         this.stationaryTimer = setTimeout(() => {
           this.isParked = true;
+          this.currentParkingPolygon = parkingPolygon.id;
           onParkingDetected(newLocation);
           this.stationaryTimer = null;
         }, this.stationaryThreshold * 1000);
@@ -135,15 +161,16 @@ export class LocationService {
         this.stationaryTimer = null;
       }
       
+      // Check if user is leaving a parking spot (moving > 50m and > 15 km/h)
       if (this.isParked && distance > 50) {
-        // User is leaving parking spot
         this.isParked = false;
+        this.currentParkingPolygon = null;
         onLeavingDetected(this.lastLocation);
       }
     }
   }
 
-  private calculateDistance(
+  calculateDistance(
     pos1: {latitude: number; longitude: number},
     pos2: {latitude: number; longitude: number},
   ): number {

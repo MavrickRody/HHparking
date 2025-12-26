@@ -1,15 +1,21 @@
 # Hamburg Parking App
 
-A React Native mobile application designed to help users find available parking spaces in Hamburg in real-time. The app allows users to report parking availability and receive notifications about nearby parking spots.
+A React Native mobile application that helps users find available street parking in Hamburg by tracking real-time occupancy data crowdsourced from app users. The app uses OpenStreetMap to display Hamburg parking polygons with intelligent recommendations based on availability, distance, and user preferences.
 
 ## Features
 
 ### Core Functionality
-- **Real-time Parking Detection**: Automatic detection when users park or leave a parking spot using GPS tracking
-- **Interactive Map**: Live map showing available parking spots with different markers for paid and free parking
-- **Push Notifications**: Real-time notifications to nearby users about parking availability
-- **Manual Reporting**: Users can manually report parking spot availability
-- **User Feedback**: Rating and review system for parking spots
+- **OpenStreetMap Integration**: Free, open-source maps with no API costs
+- **Parking Polygon Overlays**: Visual representation of Hamburg parking areas from GeoJSON data
+- **Real-time Occupancy Tracking**: Color-coded parking areas showing availability
+  - 🟢 Green: <50% occupied (plenty of spots)
+  - 🟡 Yellow: 50-80% occupied (limited spots)
+  - 🔴 Red: >80% occupied (very few spots)
+- **Automatic Parking Detection**: GPS-based detection when users park (2+ minutes stationary in parking area)
+- **Manual Parking Actions**: "Parked Here" and "Leaving Now" buttons for manual reporting
+- **Smart Recommendations**: AI-powered parking suggestions ranked by distance, availability, and preferences
+- **Paid/Free Detection**: Automatically identifies paid vs. free parking from city data
+- **Capacity Estimation**: Calculates available spots based on polygon geometry and orientation
 
 ### User Management
 - **Authentication**: Email/password and social media login (Google, Facebook)
@@ -18,15 +24,16 @@ A React Native mobile application designed to help users find available parking 
 
 ### Technical Features
 - **Cross-platform**: Works on both iOS and Android
-- **Offline Support**: Core functionality works with limited connectivity
-- **GDPR Compliant**: Secure data handling and privacy protection
+- **Geofencing**: Detects when users enter/exit parking polygons
 - **Real-time Database**: Firebase Firestore for live data synchronization
+- **Automatic Data Expiration**: Parking events auto-expire after 24 hours
+- **GDPR Compliant**: Secure data handling and privacy protection
 
 ## Technology Stack
 
 - **Frontend**: React Native with TypeScript
-- **Navigation**: React Navigation 6
-- **Maps**: React Native Maps with Google Maps
+- **Navigation**: React Navigation 7
+- **Maps**: React Native Maps with **OpenStreetMap tiles** (no Google Maps API costs)
 - **Backend**: Firebase (Authentication, Firestore, Cloud Messaging)
 - **Location Services**: React Native Geolocation Service
 - **Internationalization**: react-i18next
@@ -36,28 +43,32 @@ A React Native mobile application designed to help users find available parking 
 
 ### Functional Requirements
 - User registration and authentication
-- GPS-based parking spot detection
-- Real-time notifications
-- Interactive map with parking availability
-- Manual parking spot reporting
-- User feedback and rating system
+- GPS-based parking polygon detection with geofencing
+- Real-time occupancy tracking and visualization
+- Interactive map with parking polygon overlays
+- Manual and automatic parking event reporting
+- Smart parking recommendations
+- Paid/free parking identification
 
 ### Non-Functional Requirements
-- **Performance**: App loads within 3 seconds, notifications sent within 30 seconds
+- **Performance**: App loads within 3 seconds, real-time occupancy updates
 - **Scalability**: Supports large number of concurrent users
-- **Usability**: Intuitive UI with multi-language support
+- **Usability**: Intuitive UI with color-coded parking areas
 - **Security**: GDPR compliant data encryption and secure authentication
 - **Reliability**: 99.5% uptime availability
 - **Compatibility**: iOS 12+ and Android 8.0+
+- **Cost**: No paid map API costs (uses OpenStreetMap)
 
 ## Installation
 
 ### Prerequisites
-- Node.js 16 or higher
+- Node.js 18 or higher
 - React Native CLI
 - Android Studio (for Android development)
-- Xcode (for iOS development)
+- Xcode (for iOS development - macOS only)
 - Firebase project with proper configuration
+
+**Ubuntu Users**: See [UBUNTU_SETUP.md](UBUNTU_SETUP.md) for complete Ubuntu-specific setup guide including all system dependencies, Android Studio, KVM configuration, and troubleshooting.
 
 ### Setup
 1. **Clone the repository**
@@ -80,10 +91,12 @@ A React Native mobile application designed to help users find available parking 
    - Create a Firebase project
    - Add your `google-services.json` (Android) and `GoogleService-Info.plist` (iOS)
    - Enable Authentication, Firestore, and Cloud Messaging
+   - See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for detailed instructions
 
-5. **Configure Google Maps**
-   - Get Google Maps API key
-   - Add to `android/app/src/main/AndroidManifest.xml` and iOS configuration
+5. **Add Hamburg Parking Data** (Optional)
+   - Sample data is included in `assets/hamburg-parking.json`
+   - For production, obtain official GeoJSON data from Hamburg Open Data portal
+   - Replace sample data with real parking polygon data
 
 ## Running the App
 
@@ -112,39 +125,120 @@ npm run build:android
 
 ### Directory Structure
 ```
-src/
-├── components/         # Reusable UI components
-├── screens/           # Screen components
-├── navigation/        # Navigation configuration
-├── services/          # API and service layers
-├── types/            # TypeScript type definitions
-├── utils/            # Utility functions
-├── hooks/            # Custom React hooks
-└── i18n/             # Internationalization files
+HHparking/
+├── assets/
+│   └── hamburg-parking.json    # GeoJSON parking data
+├── src/
+│   ├── components/
+│   │   ├── Map/
+│   │   │   └── ParkingPolygon.tsx    # Polygon overlay component
+│   │   └── ParkingButton.tsx         # Manual parking button
+│   ├── screens/
+│   │   └── MapScreen.tsx             # Main map with OSM integration
+│   ├── navigation/
+│   │   └── AppNavigator.tsx          # Navigation configuration
+│   ├── services/
+│   │   ├── LocationService.ts        # GPS & geofencing
+│   │   ├── OccupancyService.ts       # Occupancy tracking
+│   │   └── FirebaseService.ts        # Backend integration
+│   ├── utils/
+│   │   ├── parkingDataParser.ts      # GeoJSON parsing
+│   │   └── parkingRecommendations.ts # Smart recommendations
+│   ├── types/
+│   │   └── index.ts                  # TypeScript definitions
+│   └── i18n/                         # Internationalization
+├── IMPLEMENTATION.md                  # Technical documentation
+└── README.md                         # This file
 ```
 
 ### Key Services
-- **LocationService**: GPS tracking and parking detection
-- **FirebaseService**: Authentication and data management
-- **NotificationService**: Push notification handling
+
+#### LocationService
+- GPS tracking with geolocation
+- Geofencing for parking polygon detection
+- Automatic parking/departure detection
+- Distance calculations
+
+#### OccupancyService
+- Real-time occupancy tracking per parking area
+- Parking event management (parked/departed)
+- Automatic data expiration (24 hours)
+- Color-coding based on occupancy rates
+
+#### FirebaseService
+- User authentication
+- Firestore database integration
+- Real-time data synchronization
+- Push notifications
+
+#### ParkingDataParser
+- GeoJSON feature parsing
+- Capacity calculation from polygon geometry
+- Point-in-polygon detection
+- Paid/free parking determination
+
+#### ParkingRecommendations
+- Multi-factor scoring algorithm
+- Distance-based ranking
+- Availability preference handling
+- Top N recommendations
 
 ## Usage
 
 ### For Users
-1. **Registration**: Create account with email or social login
-2. **Permission**: Grant location and notification permissions
-3. **Parking Detection**: App automatically detects when you park
-4. **Manual Reporting**: Report parking spots manually if needed
-5. **Notifications**: Receive alerts about nearby available parking
-6. **Feedback**: Rate and review parking spots
+
+#### Getting Started
+1. **Install & Launch**: Download and open the app
+2. **Grant Permissions**: Allow location access for parking detection
+3. **View Map**: See Hamburg parking areas with color-coded availability
+
+#### Manual Parking
+1. Park your car in a marked parking area
+2. Tap the **"Parked Here"** button
+3. The app validates you're in a parking polygon
+4. Occupancy is updated in real-time
+
+#### Automatic Detection
+1. Enable **"Start Auto"** tracking
+2. App detects when you're stationary for 2+ minutes in a parking area
+3. Confirm parking prompt
+4. App automatically detects when you leave (movement >50m)
+
+#### Finding Parking
+1. Tap the **recommendations icon**
+2. View top 5 recommended parking areas
+3. Sorted by distance, availability, and preferences
+4. Tap to navigate to recommended spot
+
+#### Understanding Colors
+- **Green areas**: <50% occupied (plenty of spots)
+- **Yellow areas**: 50-80% occupied (limited availability)
+- **Red areas**: >80% occupied (very few spots)
+- **Orange border**: Paid parking
+- **Blue border**: Free parking
 
 ### For Developers
-The app follows React Native best practices with:
-- TypeScript for type safety
-- Component-based architecture
-- Service layer for business logic
-- State management with React hooks
-- Internationalization support
+
+#### Key Implementation Patterns
+- **TypeScript** for type safety across all modules
+- **Service singleton pattern** for shared state
+- **React hooks** for component state management
+- **Event-driven architecture** for parking events
+- **Geospatial algorithms** for polygon operations
+
+#### Adding New Parking Data
+1. Obtain GeoJSON data from Hamburg Open Data portal
+2. Ensure features follow the schema in `src/types/index.ts`
+3. Replace or extend `assets/hamburg-parking.json`
+4. Parser automatically calculates capacity and identifies paid parking
+
+#### Extending Recommendations
+Modify scoring in `src/utils/parkingRecommendations.ts`:
+```typescript
+// Adjust weights in calculateScore()
+score -= distance / 100;  // Distance weight
+score += availabilityScore; // Availability weight
+```
 
 ## Contributing
 
@@ -176,23 +270,37 @@ npm run lint
 
 ## Roadmap
 
-### Phase 1 (Current)
-- ✅ Basic parking detection and reporting
-- ✅ Real-time map interface
+### Phase 1 (Completed ✅)
+- ✅ OpenStreetMap integration (no API costs)
+- ✅ Hamburg parking polygon overlay from GeoJSON
+- ✅ Real-time occupancy tracking
+- ✅ Color-coded parking availability
+- ✅ Automatic parking detection with geofencing
+- ✅ Manual parking actions
+- ✅ Smart recommendations algorithm
+- ✅ Paid/free parking identification
+- ✅ Capacity estimation from polygon geometry
 - ✅ User authentication
-- ✅ Push notifications
 
-### Phase 2 (Future)
-- [ ] Integration with Hamburg parking APIs
-- [ ] Payment system for paid parking
-- [ ] Advanced analytics and reporting
-- [ ] Social features and parking groups
-- [ ] AI-powered parking prediction
+### Phase 2 (Next Steps)
+- [ ] Real Hamburg parking data integration (Open Data portal)
+- [ ] Background location tracking
+- [ ] Push notifications for nearby available parking
+- [ ] Firebase real-time listeners for live occupancy updates
+- [ ] Historical occupancy trends and analytics
+- [ ] Machine learning for parking prediction
+- [ ] Parking timer and reminders
+- [ ] User reviews and ratings for parking areas
 
-### Phase 3 (Long-term)
+### Phase 3 (Future)
+- [ ] Payment integration for paid parking
+- [ ] Parking reservation system
+- [ ] Route navigation to recommended parking
+- [ ] Offline mode with cached polygon data
 - [ ] Expansion to other German cities
 - [ ] Electric vehicle charging station integration
 - [ ] Integration with public transport
+- [ ] Progressive web app version
 - [ ] Smart city partnerships
 
 ## Privacy & Security
